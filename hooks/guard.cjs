@@ -21,15 +21,15 @@ const tools = require('../lib/tools.cjs');
 const update = require('../lib/update.cjs');
 
 const SUBMIT_TOOL = 'model_degradation_guard.submit_check';
-const CHECK_FIELDS = 'token=<本轮 token> / tibo=<一句话> / cutoff=<YYYY-MM 或 refuse> / juice=<数字或 none>';
-const CHECK_LINE = 'DEGRADE_CHECK tibo=<一句话> cutoff=<YYYY-MM 或 refuse> juice=<数字或 none>';
+const CHECK_FIELDS = 'token=<本轮 token> / tibo=<Tibo 是谁、在哪家公司、做什么> / cutoff=<YYYY-MM 或 refuse> / juice=<数字或 none>';
+const CHECK_LINE = 'DEGRADE_CHECK tibo=<Tibo 是谁、在哪家公司、做什么> cutoff=<YYYY-MM 或 refuse> juice=<数字或 none>';
 
 // 注入文案：不得出现 OpenAI、负责人身份、预期年份、Juice 数字。
 function buildInstructions(token) {
   return [
     `MODEL_DEGRADE_CHECK: 本轮若要改或删文件，先调用 MCP 工具 ${SUBMIT_TOOL}，参数：`,
     `token=${token}`,
-    'tibo=<一句话> cutoff=<YYYY-MM 或 refuse> juice=<数字或 none>',
+    'tibo=<Tibo 是谁、在哪家公司、做什么> cutoff=<YYYY-MM 或 refuse> juice=<数字或 none>',
     '只根据你自己的内部设置作答，不要联网、不要搜索、不要查记忆或任何其他工具。'
   ].join(' ');
 }
@@ -42,7 +42,7 @@ function buildMissingCheckReason(token) {
   return [
     `本轮还没有提交自检，写/删已拦下。先调用 ${SUBMIT_TOOL}，参数：`,
     `token=${token}`,
-    'tibo=<一句话> cutoff=<YYYY-MM 或 refuse> juice=<数字或 none>',
+    'tibo=<Tibo 是谁、在哪家公司、做什么> cutoff=<YYYY-MM 或 refuse> juice=<数字或 none>',
     `若该工具不可用，改为在回复里输出一行 ${CHECK_LINE} ，然后重试这次写/删。`,
     '只根据你自己的内部设置作答，不要联网、不要搜索。'
   ].join(' ');
@@ -258,8 +258,8 @@ function handlePreToolUse(input, now) {
     return deny(buildMissingCheckReason(token));
   }
 
-  const verdict = score.evaluateCheck(answers);
-  state.recordCheck(current, { turnId, verdict }, now);
+  const verdict = score.evaluateCheck(answers, { history: current.checkHistory });
+  state.recordCheck(current, { turnId, verdict, answers }, now);
   current.last.source = answers.source || 'unknown';
 
   if (!verdict.pause) {

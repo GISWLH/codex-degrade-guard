@@ -209,7 +209,7 @@ test('放行后即使换成另一种降智情形也不阻断，但继续记录',
   const saved = state.readState(sessionId);
   assert.equal(saved.status, 'degraded_approved');
   assert.equal(saved.usedDegraded, true);
-  assert.equal(saved.last.reason, 'tibo_ambiguous_with_canary');
+  assert.equal(saved.last.reason, 'tibo_repeated_unresolved');
 });
 
 test('放行后本轮没提交也不阻断', () => {
@@ -410,7 +410,7 @@ test('UserPromptSubmit 每轮都注入 token 与自检要求，文案不泄题',
   const token = /token=([A-Za-z0-9_-]+)/.exec(context)[1];
   assert.equal(state.readState('session-inject').check.token, token);
   assert.equal(state.readState('session-inject').check.turnId, 'turn-inject');
-  assert.match(context, /tibo=<一句话> cutoff=<YYYY-MM 或 refuse> juice=<数字或 none>/);
+  assert.match(context, /tibo=<Tibo 是谁、在哪家公司、做什么> cutoff=<YYYY-MM 或 refuse> juice=<数字或 none>/);
   assertNoLeak(context.replace(new RegExp(token, 'g'), ''));
   assert.match(context, /不要联网|不要搜索/);
 });

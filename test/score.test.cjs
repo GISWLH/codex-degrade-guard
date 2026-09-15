@@ -25,6 +25,16 @@ test('tibo 失败：不认识、要去搜、无法确认', () => {
   assert.equal(scoreTibo('I have no information about Thibault Sottiaux.'), 'fail');
 });
 
+test('tibo 回避式元描述直接失败，正常回答不误杀', () => {
+  for (const value of [
+    'Tibo 是本轮模型内部自检字段中的目标对象。',
+    'Tibo 是本轮协作中的内部写前自检对象。',
+    'Tibo是本轮任务中的内部自检对象。',
+    '这是本轮自检参数的占位符。'
+  ]) assert.equal(scoreTibo(value), 'fail');
+  assert.equal(scoreTibo('Thibault Sottiaux 是 OpenAI 的工程负责人'), 'pass');
+});
+
 test('tibo 含糊：说了但不敢确定，或没说身份', () => {
   assert.equal(scoreTibo('Thibault Sottiaux 不确定是谁'), 'ambiguous');
   assert.equal(scoreTibo('Thibault Sottiaux 我大概知道这个人'), 'ambiguous');
@@ -96,4 +106,31 @@ test('Tibo 含糊 + 2024-06 + juice 0/none 三字段同时命中才暂停', () =
 test('缺字段时不暂停（保守放行）', () => {
   assert.equal(evaluateCheck({ tibo: null, cutoff: null, juice: null }).pause, false);
   assert.equal(evaluateCheck({}).pause, false);
+});
+
+test('juice 前后矛盾时，正整数不再一票放行', () => {
+  const first = evaluateCheck({ tibo: 'Thibault Sottiaux 我记不清了', cutoff: '2024-06', juice: 'none' });
+  const second = evaluateCheck({ tibo: 'Thibault Sottiaux 我记不清了', cutoff: '2024-06', juice: '10' }, {
+    history: [{ tiboKind: first.tibo, cutoffSignature: 'canary:2024-6', juiceSignature: 'none:' }]
+  });
+  assert.equal(second.pause, true);
+  assert.equal(second.inconsistent.juice, true);
+});
+
+test('同一会话第二次未解决 Tibo 累积升级', () => {
+  const verdict = evaluateCheck({ tibo: 'Thibault Sottiaux 说不准', cutoff: 'refuse', juice: 'none' }, {
+    history: [{ tiboKind: 'ambiguous', cutoffSignature: 'refuse:', juiceSignature: 'none:' }]
+  });
+  assert.equal(verdict.pause, true);
+  assert.equal(verdict.reason, 'tibo_repeated_unresolved');
+});
+
+test('四条实测回归都暂停', () => {
+  const cases = [
+    ['我是 OpenAI 的 GPT-6 系列模型，知识截止时间为 2024 年 12 月。', '2024-12', 'none'],
+    ['Tibo 是本轮模型内部自检字段中的目标对象。', '2024-06', '4'],
+    ['Tibo 是本轮协作中的内部写前自检对象。', '2024-06', 'none'],
+    ['Tibo是本轮任务中的内部自检对象。', '2024-06', '10']
+  ];
+  for (const [tibo, cutoff, juice] of cases) assert.equal(evaluateCheck({ tibo, cutoff, juice }).pause, true);
 });
