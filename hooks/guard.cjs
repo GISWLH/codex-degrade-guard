@@ -177,7 +177,8 @@ function handleUserPromptSubmit(input, now, ensureFreshImpl = update.ensureFresh
 
 // 本轮自检来源优先级：MCP 工具写入的状态 > transcript 里的工具调用 > 兼容旧格式的正文行。
 function resolveAnswers(input, current, snapshot) {
-  const recorded = state.answersForCurrentCheck(current);
+  if (!input.turn_id) return null;
+  const recorded = state.answersForCurrentCheck(current, input.turn_id);
   if (recorded) return { ...recorded, source: recorded.source || 'state' };
 
   const fromTools = transcript.extractSubmittedCheck(snapshot.records, input.turn_id);
@@ -243,27 +244,27 @@ function handlePreToolUse(input, now) {
   const answers = resolveAnswers(input, current, snapshot);
 
   if (!answers) {
-    if (snapshot.capacityError) {
-      current.status = 'overloaded';
+    if (snapshot.capacityError && current.status !== 'degraded') {
+      if (current.status !== 'degraded_approved') current.status = 'overloaded';
       state.writeState(current, now);
       return { systemMessage: OVERLOAD_NOTE };
     }
-    // 已放行的会话不再阻断；本轮没提交只是本轮没检测到，不影响本会话已有结论。
-    if (current.status === 'degraded_approved') {
-      markWriteAllowed(current, turnId, now);
-      state.writeState(current, now);
-      return null;
+    if (!current.check || current.check.turnId !== turnId) {
+      state.startCheck(current, { turnId, token: crypto.randomBytes(12).toString('base64url') }, now);
     }
+    if (current.status === 'degraded') current.recoveryTurns = [];
+    state.writeState(current, now);
     const token = current.check ? current.check.token : '';
     return deny(buildMissingCheckReason(token));
   }
 
-  const verdict = score.evaluateCheck(answers, { history: current.checkHistory });
+  const verdict = score.evaluateCheck(answers, {
+    history: current.checkHistory.filter((entry) => entry.turnId !== turnId), today: score.localDate(now)
+  });
   state.recordCheck(current, { turnId, verdict, answers }, now);
   current.last.source = answers.source || 'unknown';
 
-  if (!verdict.pause) {
-    if (current.status !== 'degraded_approved') current.status = 'healthy';
+  if (!verdict.pause && current.status !== 'degraded') {
     markWriteAllowed(current, turnId, now);
     state.writeState(current, now);
     return null;
@@ -290,7 +291,9 @@ function handleStop(input, now) {
     const since = current.firstDegradedAt
       ? `（首次命中：${new Date(current.firstDegradedAt).toLocaleString()}）`
       : '';
-    const warning = `${STOP_WARNING}${since}`;
+    const release = current.approval || current.recoveredAt;
+    const released = release ? `（解封依据：${release.basis || release.reason}；时间：${new Date(release.at).toLocaleString()}）` : '';
+    const warning = `${STOP_WARNING}${since}${released}`;
 
     // systemMessage 在 Codex app/CLI 里都不会显示给用户（实测），能看见的只有模型自己说的话，
     // 所以提醒走 Stop block + reason 让模型转达；频率：首次 + 每 N 个降智写入回合（默认 5），

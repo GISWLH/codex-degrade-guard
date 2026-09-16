@@ -7,7 +7,7 @@
 写/删前拦住偷偷换弱模型
 
 [![CI](https://github.com/Awfp1314/codex-degrade-guard/actions/workflows/ci.yml/badge.svg)](https://github.com/Awfp1314/codex-degrade-guard/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-0.1.13-0B1220?style=flat-square)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.2.0-0B1220?style=flat-square)](CHANGELOG.md)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D22-brightgreen.svg?style=flat-square)](package.json)
 [![Codex Plugin](https://img.shields.io/badge/Codex-plugin-111827?style=flat-square)](https://developers.openai.com/codex/plugins)
@@ -170,10 +170,11 @@ node probes/candy.cjs -n 5 --json
    ├─ 读 / 搜 ──────────────────────────► 直接放行（不打扰）
    │
    └─ 写 / 删 ─► PreToolUse
-                  ├─ 已放行本会话 ──────► 放行（继续检测并记录）
                   ├─ 本轮没提交自检 ────► deny：先调用 submit_check 再写
-                  ├─ Tibo 失败 / 组合命中 ► deny + 询问；回复「继续」后本会话不再阻断
-                  └─ 通过 ──────────────► 放行
+                  ├─ 已批准且本轮已打卡 ► 放行（继续检测并记录）
+                  ├─ Tibo 失败 / 具体日期 / 组合命中 ► deny + 询问
+                  ├─ 已 degraded ───────► 保持 deny，直到明确批准或连续三轮 Tibo pass
+                  └─ 未暂停 ────────────► 放行
 Stop ─► 降智会话里真的写下了东西，才提醒「这段内容质量可能很低，请勿直接提交」
         （首次必提，之后每 5 个降智写入回合或每 30 分钟再提一次）
 ```
@@ -182,15 +183,19 @@ Stop ─► 降智会话里真的写下了东西，才提醒「这段内容质�
 
 ### 打分
 
-| 字段 | 通过 | 失败 / 旁证 |
+| 字段 | 健康证据 / 无证据 | 暂停证据 / 旁证 |
 |------|------|------|
 | tibo | 能回答 Tibo 是谁、在哪家公司、做什么，且不靠搜索 | 不认识、要去搜、无法确认，或把 Tibo 说成本轮字段/自检对象（单独即暂停） |
-| cutoff | 拒答 / refuse，或非 `2024-06` | `2024-06` 仅旁证 |
+| cutoff | `grounded`：含糊/拒绝自述 + 自发提及当天日期（±1 天）；`vague`：仅拒答/含糊，无证据；空值为 `missing` | `concrete`：任何具体截止日期，包括直接把今天当截止日期；默认单独暂停 |
 | juice | 正整数 | `0` / `none` 仅旁证；同一会话前后不一致时当前值不可信 |
 
-暂停条件：**Tibo 失败**；或 **Tibo 含糊 且 cutoff=`2024-06` 且 juice 为 `0/none`**；同一会话第二次未解决 Tibo 时累计升级。juice 或 cutoff 前后自报不一致时，当前正向值不能单点放行。
+暂停条件：**Tibo 失败**或 **cutoff 为 concrete**，各自独立生效；同一会话第二个不同回合仍未解决 Tibo 时累计升级。旧的 Tibo 含糊 + 截止金丝雀 + juice 为 `0/none`（或历史矛盾）的组合规则保留，尤其用于回滚模式。`vague` 和 `grounded` 都不能抵消失败，也不能单独解封。
 
-只有截止年金丝雀、Juice 偏低但非 0、上游 capacity 过载，都不暂停。预期答案只活在 `lib/score.cjs`，注入文案里不出现。
+评分先提取答案中的全部日期。任一日期不是当地今天（完整日期容差 ±1 天）即为 `concrete`；仅年份/年月不能精确锚定今天，也算具体截止。所有日期都在容差内且有拒绝/含糊语义才是 `grounded`。例如 `2024-12`、单独的 `2026-09-16` 都暂停；以今天为 `2026-09-16` 时，“我不确定，但今天是 2026-09-16”不因 cutoff 暂停。`refuse` 只是无证据，不加分、不解封。
+
+`MODEL_DEGRADATION_GUARD_CONCRETE_CUTOFF_MODE=pause|flag|off`，默认 `pause`。`flag` 只记录新日期信号，供收集误报率，其他旧暂停规则仍生效；`off` 恢复旧 cutoff 口径。每条 `checkHistory` 都记录 `cutoffConcrete` 布尔值。模型如实报告了真实知识截止日期也可能被拦，这是本次保守口径的误报风险，并非已验证的路由鉴定。
+
+Juice 偏低但非 0 不单独暂停；上游 capacity 不当降智，也不能清除已有 degraded。预期答案不进入注入文案；**不提示模型填写当天日期**，grounding 必须自发提供。
 
 ### 状态
 
@@ -199,11 +204,13 @@ Stop ─► 降智会话里真的写下了东西，才提醒「这段内容质�
 | 状态 | 行为 |
 |------|------|
 | `unknown` / `healthy` | 写前仍要本轮打卡 |
-| `degraded` | 写/删暂停并询问 |
-| `degraded_approved` | 本会话不再阻断，只检测并记录 |
+| `degraded` | 写/删持续 deny，直到明确批准或满足连续恢复条件 |
+| `degraded_approved` | 本轮打卡后豁免评分暂停，继续记录 |
 | `overloaded` | 只提示过载，不当降智 |
 
-批准只绑当前 `session_id`。回复「继续」后本会话不再拦工具；降智证据照常记录，交给 `Stop` 提醒。
+批准只绑当前 `session_id`。回复「继续」沿用 `approveSession`，记录 `approval.basis` 与时间；每轮仍须自己的打卡。自动恢复要求连续 N 个不同回合均 `verdict.pause=false` 且 `tibo=pass`，默认 N=3，环境变量 `MODEL_DEGRADATION_GUARD_RECOVERY_PASSES` 可覆盖；含糊、失败或缺失打卡会中断累计。同轮重试不加次数。cutoff 任何档位都不充当恢复分数；Tibo pass 配合非暂停结果才计一轮。恢复写入 `recoveredAt`（原因、回合列表、阈值、时间），后续再次命中仍会暂停。
+
+状态答案必须同时匹配 token、答案 turnId、check.turnId 和工具调用 turn_id。子回合缺打卡时 deny 并签发该回合 token；父会话或上一回合答案不能复用。transcript 备用答案也按当前回合切片。降智后实际放行过写删才由 `Stop` 提醒，并附解封依据。
 
 ## 欢迎贡献
 
@@ -236,12 +243,13 @@ npm test
 - **联网**：每次用户消息触发时访问 GitHub 上的 `plugin.json` 看有没有新版本；只要本地版本落后，就让模型在回复里持续提醒。失败则静默，不自动安装。`MODEL_DEGRADATION_GUARD_UPDATE_CHECK=0` 可关。
 - **写入**：`$CODEX_HOME/model-degradation-guard/<session_id>.json`（7 天后清理），以及同目录 `update.json`。
 - **注入**：每轮向模型上下文追加一段自检要求（含一次性 token）；有新版本时另加一句请模型转述。
-- **拦截**：会对写/删工具返回 `deny`；回复「继续」后本会话不再拦截。
+- **拦截**：会对写/删工具返回 `deny`；回复「继续」后豁免本会话评分暂停，但仍须本轮自检。
 - **关闭**：设置 → 钩子里逐个关，或设 `MODEL_DEGRADATION_GUARD_DISABLE=1`。
 
 ## 局限
 
 - 判定是启发式，会被统一话术污染；只拦高置信，所以会漏报，也可能误报。
+- **本插件只覆盖显式写/删特征，不作为安全边界。** shell 分类先保护引号和路径参数，再按命令位置判断；无法识别的命令默认放行。别名、动态拼接、复杂 shell 语法及未覆盖的脚本写入 API 可能漏报；`npm test` 等也可能写缓存。钩子异常、超时或 transcript 不可读仍 fail-open。
 - 体检探针消耗真实额度，只反映启动它们的那个 CLI / 凭据环境。
 - 平台细节会变。插件按 Codex 0.150 / 0.154 的行为实现。
 
@@ -264,7 +272,7 @@ test/
 
 `.mcp.json` 的 `cwd` 必须写 `./`。`${PLUGIN_ROOT}` 在这里不会被展开。
 
-实现上几处取舍（都有实测依据）：暂停用 `deny` 不用 `ask`；自检走 MCP 不走正文；结束提醒用 `Stop` 的 `block` 让模型转述；放行覆盖整个会话、不再重复询问。细节见 [`docs/design.md`](docs/design.md)。
+实现上几处取舍（都有实测依据）：暂停用 `deny` 不用 `ask`；自检优先 MCP，正文行作备用；结束提醒用 `Stop` 的 `block` 让模型转述；用户批准豁免本会话评分暂停，但每轮仍须打卡。细节见 [`docs/design.md`](docs/design.md)。
 
 变更见 [`CHANGELOG.md`](CHANGELOG.md)。
 

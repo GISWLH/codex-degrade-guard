@@ -151,8 +151,12 @@ test('answersForCurrentCheck 只认当前轮令牌的答案', () => {
   current.answers = { token: 'tok-0', tibo: 'stale' };
   assert.equal(state.answersForCurrentCheck(current), null);
 
-  current.answers = { token: 'tok-1', tibo: 'fresh' };
-  assert.equal(state.answersForCurrentCheck(current).tibo, 'fresh');
+  current.answers = { token: 'tok-1', turnId: 'turn-1', tibo: 'fresh' };
+  assert.equal(state.answersForCurrentCheck(current, 'turn-1').tibo, 'fresh');
+  assert.equal(state.answersForCurrentCheck(current, 'turn-child'), null);
+  assert.equal(state.answersForCurrentCheck(current), null);
+  current.answers.turnId = 'turn-stale';
+  assert.equal(state.answersForCurrentCheck(current, 'turn-1'), null);
 
   // 新的一轮刷新 token 后，上一轮答案自动失效。
   state.startCheck(current, { turnId: 'turn-2', token: 'tok-2' }, 1700000000000);
