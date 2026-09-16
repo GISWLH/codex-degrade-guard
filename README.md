@@ -7,7 +7,7 @@
 写/删前拦住偷偷换弱模型
 
 [![CI](https://github.com/Awfp1314/codex-degrade-guard/actions/workflows/ci.yml/badge.svg)](https://github.com/Awfp1314/codex-degrade-guard/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-0.2.1-0B1220?style=flat-square)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.2.2-0B1220?style=flat-square)](CHANGELOG.md)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D22-brightgreen.svg?style=flat-square)](package.json)
 [![Codex Plugin](https://img.shields.io/badge/Codex-plugin-111827?style=flat-square)](https://developers.openai.com/codex/plugins)
@@ -214,7 +214,7 @@ Juice 偏低但非 0 不单独暂停；上游 capacity 不当降智，也不能�
 
 ## 安装与生效校验
 
-**改完必须验证 cache 里就是新代码**，不能用 work 目录的测试或安装成功提示代替。每次发布同步 bump `package.json` 和 `.codex-plugin/plugin.json`，禁止同版本覆盖安装；旧会话可能仍持有旧插件路径，版本切换后应重开会话或重启 Desktop 加载新版。
+**改完必须验证 cache 里就是新代码**，不能用 work 目录的测试或安装成功提示代替。每次发布同步 bump `package.json` 和 `.codex-plugin/plugin.json`，禁止同版本覆盖安装；旧会话可能仍持有旧插件路径，版本切换后应重开会话或重启 Desktop 加载新版。Codex Desktop 的 hook 必须以内嵌对象写在 `.codex-plugin/plugin.json` 的 `hooks.hooks` 下，单独放 `hooks/hooks.json` 不会在重启后注册。
 
 本地开发版本用本地 marketplace，示例 PowerShell（目录必须保留）：
 
@@ -227,10 +227,10 @@ Select-String -Path "$env:USERPROFILE/.codex/config.toml" -Pattern '^\[marketpla
 
 确认 marketplace 为 `source_type = "local"` 且 source 为上述目录，plugin 为 enabled。该本地源的 marketplace upgrade 不会从 GitHub 拉取；若以后重新注册为 git 源，则此保障不再成立。若采用 GitHub 源，**push 之前不要执行 marketplace upgrade**，必须先 push 包含新版本的提交，再 upgrade、安装并验证 cache。
 
-安装返回的 installedPath 才是本次应检查的目录。以 0.2.1 为例（CODEX_HOME 自定义时使用对应目录）：
+安装返回的 installedPath 才是本次应检查的目录。以 0.2.2 为例（CODEX_HOME 自定义时使用对应目录）：
 
 ```powershell
-$cache = "$env:USERPROFILE/.codex/plugins/cache/model-degradation-guard/model-degradation-guard/0.2.1"
+$cache = "$env:USERPROFILE/.codex/plugins/cache/model-degradation-guard/model-degradation-guard/0.2.2"
 Get-Item "$cache/lib/score.cjs" | Select-Object FullName,LastWriteTime
 rg -c concrete "$cache/lib/score.cjs"
 node -e 'const s=require(process.argv[1]); for(const tibo of ["Tibo 是 Anthropic 的一名研究人员，负责 Claude 模型相关工作。","Tibo 是 Google DeepMind 的研究员。","Thibault Sottiaux 是 OpenAI 的 Codex 团队负责人。"]) { const v=s.evaluateCheck({tibo,cutoff:"refuse",juice:"10"}); console.log(JSON.stringify({tibo,result:v.tibo,pause:v.pause,reason:v.reason})); }' "$cache/lib/score.cjs"

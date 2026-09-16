@@ -2,6 +2,13 @@
 
 按 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 组织，版本号遵循 [SemVer](https://semver.org/lang/zh-CN/)。
 
+## [0.2.2] - 2026-09-16
+
+### Fixed
+
+- 修复 Codex Desktop 重启后 hook 不注册：将 `UserPromptSubmit`、`PreToolUse`、`Stop` 从外部路径字符串改为 `.codex-plugin/plugin.json` 内嵌清单对象。
+- 同步提升 `package.json` 与插件清单版本，避免同版本缓存覆盖。
+
 ## [0.2.1] - 2026-09-16
 
 ### Fixed
