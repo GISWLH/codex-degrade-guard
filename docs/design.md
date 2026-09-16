@@ -1,6 +1,6 @@
 # Codex 降智检查插件设计
 
-更新：2026-09-16，版本 0.2.1。历史动机见 `background.md`，旧 MVP 不代表当前评分契约。
+更新：2026-09-16，版本 0.2.2。历史动机见 `background.md`，旧 MVP 不代表当前评分契约。
 
 身份优先判定：PERSON 与 WRONG_AFFILIATION 同时命中直接 fail，reason 为 `tibo_wrong_affiliation`；优先于正确公司、一般 tibo_fail 和 cutoff 信号。错误归属名单及安装校验命令见 README。严格关键词共现会误伤否定/对比语句，当前按用户要求保留此取舍。
 
@@ -15,7 +15,7 @@
 | 文件 | 职责 |
 |---|---|
 | `.codex-plugin/plugin.json`、`package.json` | 插件清单与同步版本 |
-| `hooks/guard.cjs`、`hooks/hooks.json` | UserPromptSubmit、PreToolUse、Stop |
+| `hooks/guard.cjs`、`.codex-plugin/plugin.json` | UserPromptSubmit、PreToolUse、Stop；当前发行版将 hook 清单内嵌在插件清单中 |
 | `lib/tools.cjs` | 文件工具与 shell 命令分类 |
 | `lib/score.cjs` | Tibo、cutoff、Juice 本地评分 |
 | `lib/state.cjs` | 会话 token、回合答案、黏性状态、历史 |
@@ -24,7 +24,7 @@
 | `lib/update.cjs` | 查版本，只通知不安装 |
 | `probes/`、`skills/` | 手动体检，不在写前热路径运行 |
 
-清单指向 `./skills/`、`./hooks/hooks.json` 和 `./.mcp.json`。MCP cwd 必须为 `./`，不使用不被展开的 `${PLUGIN_ROOT}`。
+清单指向 `./skills/` 和 `./.mcp.json`；当前发行版把三个 hook 的命令对象直接写入 `.codex-plugin/plugin.json` 的 `hooks.hooks`。MCP cwd 必须为 `./`，不使用不被展开的 `${PLUGIN_ROOT}`。
 
 ## 写前流程
 

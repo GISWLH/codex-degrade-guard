@@ -214,7 +214,7 @@ Juice 偏低但非 0 不单独暂停；上游 capacity 不当降智，也不能�
 
 ## 安装与生效校验
 
-**改完必须验证 cache 里就是新代码**，不能用 work 目录的测试或安装成功提示代替。每次发布同步 bump `package.json` 和 `.codex-plugin/plugin.json`，禁止同版本覆盖安装；旧会话可能仍持有旧插件路径，版本切换后应重开会话或重启 Desktop 加载新版。Codex Desktop 的 hook 必须以内嵌对象写在 `.codex-plugin/plugin.json` 的 `hooks.hooks` 下，单独放 `hooks/hooks.json` 不会在重启后注册。
+**改完必须验证 cache 里就是新代码**，不能用 work 目录的测试或安装成功提示代替。每次发布同步 bump `package.json` 和 `.codex-plugin/plugin.json`，禁止同版本覆盖安装；旧会话可能仍持有旧插件路径，版本切换后应重开会话或重启 Desktop 加载新版。本版本采用内嵌对象写在 `.codex-plugin/plugin.json` 的 `hooks.hooks` 下，便于在当前 Codex Desktop 安装链路中自检注册结果；`hooks/hooks.json` 保留为源码参考，不作为本版本的清单入口。
 
 本地开发版本用本地 marketplace，示例 PowerShell（目录必须保留）：
 
