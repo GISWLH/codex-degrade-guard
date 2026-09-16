@@ -2,6 +2,18 @@
 
 按 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 组织，版本号遵循 [SemVer](https://semver.org/lang/zh-CN/)。
 
+## [0.2.1] - 2026-09-16
+
+### Fixed
+
+- 人名与错误归属词同时出现时直接 fail，独立暂停并记录 `tibo_wrong_affiliation`；覆盖 Anthropic/Claude、Google/DeepMind/Gemini 等指定名单，优先于正确公司关键词，不依赖 cutoff 或 Juice。
+- 新增两条实测错误归属、完整名单、三种 cutoff 模式和正确真实回答回归，以及 hook deny 与状态落盘断言。
+
+### Changed
+
+- 包与清单同步升级 0.2.1，通过新版本目录安装，禁止同版本覆盖。
+- README 增加“安装与生效校验”：验证实际 cache 的 mtime、concrete 行数、直接评分、配置指向与文件哈希；本地源避免远端 upgrade 覆盖，GitHub 源必须先 push 再 upgrade。
+
 ## [0.2.0] - 2026-09-16
 
 ### Breaking

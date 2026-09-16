@@ -5,6 +5,40 @@ const assert = require('node:assert/strict');
 
 const { evaluateCheck, scoreCutoff, scoreJuice, scoreTibo } = require('../lib/score.cjs');
 
+test('错误公司归属独立失败，不依赖 cutoff 模式或 Juice', () => {
+  const answers = [
+    'Tibo 是 Anthropic 的一名研究人员，负责 Claude 模型相关工作。',
+    'Tibo 是 Google DeepMind 的研究员。'
+  ];
+  for (const tibo of answers) {
+    assert.equal(scoreTibo(tibo), 'fail');
+    for (const concreteCutoffMode of ['pause', 'flag', 'off']) {
+      for (const cutoff of ['refuse', '2024-06']) {
+        const verdict = evaluateCheck({ tibo, cutoff, juice: '10' }, { concreteCutoffMode });
+        assert.equal(verdict.pause, true);
+        assert.equal(verdict.reason, 'tibo_wrong_affiliation');
+      }
+    }
+  }
+});
+
+test('错误归属名单全覆盖且优先于正确公司词', () => {
+  for (const company of ['Anthropic', 'Claude', 'Google', 'DeepMind', 'Gemini', 'Meta', 'LLaMA', 'Mistral', 'xAI', 'Grok', 'Cohere', 'Stability', '阿里', '字节', '百度', '腾讯', '月之暗面', '智谱', 'DeepSeek']) {
+    assert.equal(scoreTibo(`Tibo 是 ${company} 的研究员。`), 'fail', company);
+    assert.equal(evaluateCheck({ tibo: `Tibo 在 OpenAI 和 ${company} 工作。`, cutoff: 'refuse' }).reason, 'tibo_wrong_affiliation', company);
+  }
+  assert.equal(scoreTibo('Anthropic 的研究员。'), 'ambiguous');
+  assert.equal(scoreTibo('Tibo works at OpenAI on metadata.'), 'pass');
+});
+
+test('会话 01a0a854 的真实正确回答继续通过', () => {
+  const tibo = 'Thibault Sottiaux 是 OpenAI 的 Codex 团队负责人。';
+  assert.equal(scoreTibo(tibo), 'pass');
+  const verdict = evaluateCheck({ tibo, cutoff: 'refuse', juice: 'none' });
+  assert.equal(verdict.pause, false);
+  assert.equal(verdict.reason, null);
+});
+
 test('tibo 通过：能说出 Thibault/Tibo 属于 OpenAI 或 Codex', () => {
   assert.equal(scoreTibo('Thibault Sottiaux 是 OpenAI 这边的工程负责人'), 'pass');
   assert.equal(scoreTibo('Tibo Sottiaux works on Codex at OpenAI.'), 'pass');

@@ -1,6 +1,8 @@
 # Codex 降智检查插件设计
 
-更新：2026-09-16，版本 0.2.0。历史动机见 `background.md`，旧 MVP 不代表当前评分契约。
+更新：2026-09-16，版本 0.2.1。历史动机见 `background.md`，旧 MVP 不代表当前评分契约。
+
+身份优先判定：PERSON 与 WRONG_AFFILIATION 同时命中直接 fail，reason 为 `tibo_wrong_affiliation`；优先于正确公司、一般 tibo_fail 和 cutoff 信号。错误归属名单及安装校验命令见 README。严格关键词共现会误伤否定/对比语句，当前按用户要求保留此取舍。
 
 ## 目标与边界
 

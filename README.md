@@ -7,7 +7,7 @@
 写/删前拦住偷偷换弱模型
 
 [![CI](https://github.com/Awfp1314/codex-degrade-guard/actions/workflows/ci.yml/badge.svg)](https://github.com/Awfp1314/codex-degrade-guard/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-0.2.0-0B1220?style=flat-square)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.2.1-0B1220?style=flat-square)](CHANGELOG.md)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D22-brightgreen.svg?style=flat-square)](package.json)
 [![Codex Plugin](https://img.shields.io/badge/Codex-plugin-111827?style=flat-square)](https://developers.openai.com/codex/plugins)
@@ -185,7 +185,7 @@ Stop ─► 降智会话里真的写下了东西，才提醒「这段内容质�
 
 | 字段 | 健康证据 / 无证据 | 暂停证据 / 旁证 |
 |------|------|------|
-| tibo | 能回答 Tibo 是谁、在哪家公司、做什么，且不靠搜索 | 不认识、要去搜、无法确认，或把 Tibo 说成本轮字段/自检对象（单独即暂停） |
+| tibo | 能回答 Tibo 是谁、在哪家公司、做什么，且不靠搜索 | 人名与错误公司/模型词同时命中则 `tibo_wrong_affiliation`；不认识、要去搜、无法确认或回避身份为 `tibo_fail`。两者单独即暂停 |
 | cutoff | `grounded`：含糊/拒绝自述 + 自发提及当天日期（±1 天）；`vague`：仅拒答/含糊，无证据；空值为 `missing` | `concrete`：任何具体截止日期，包括直接把今天当截止日期；默认单独暂停 |
 | juice | 正整数 | `0` / `none` 仅旁证；同一会话前后不一致时当前值不可信 |
 
@@ -211,6 +211,37 @@ Juice 偏低但非 0 不单独暂停；上游 capacity 不当降智，也不能�
 批准只绑当前 `session_id`。回复「继续」沿用 `approveSession`，记录 `approval.basis` 与时间；每轮仍须自己的打卡。自动恢复要求连续 N 个不同回合均 `verdict.pause=false` 且 `tibo=pass`，默认 N=3，环境变量 `MODEL_DEGRADATION_GUARD_RECOVERY_PASSES` 可覆盖；含糊、失败或缺失打卡会中断累计。同轮重试不加次数。cutoff 任何档位都不充当恢复分数；Tibo pass 配合非暂停结果才计一轮。恢复写入 `recoveredAt`（原因、回合列表、阈值、时间），后续再次命中仍会暂停。
 
 状态答案必须同时匹配 token、答案 turnId、check.turnId 和工具调用 turn_id。子回合缺打卡时 deny 并签发该回合 token；父会话或上一回合答案不能复用。transcript 备用答案也按当前回合切片。降智后实际放行过写删才由 `Stop` 提醒，并附解封依据。
+
+## 安装与生效校验
+
+**改完必须验证 cache 里就是新代码**，不能用 work 目录的测试或安装成功提示代替。每次发布同步 bump `package.json` 和 `.codex-plugin/plugin.json`，禁止同版本覆盖安装；旧会话可能仍持有旧插件路径，版本切换后应重开会话或重启 Desktop 加载新版。
+
+本地开发版本用本地 marketplace，示例 PowerShell（目录必须保留）：
+
+```powershell
+codex plugin marketplace add C:/Users/hhuwl/Documents/Codex/2026-09-16/model-degradation-guard-0-1-19/work/model-degradation-guard --json
+codex plugin add model-degradation-guard@model-degradation-guard --json
+codex plugin list | Select-String 'model-degradation-guard' -Context 0,4
+Select-String -Path "$env:USERPROFILE/.codex/config.toml" -Pattern '^\[marketplaces\.model-degradation-guard\]','^\[plugins\."model-degradation-guard@model-degradation-guard"\]' -Context 0,3
+```
+
+确认 marketplace 为 `source_type = "local"` 且 source 为上述目录，plugin 为 enabled。该本地源的 marketplace upgrade 不会从 GitHub 拉取；若以后重新注册为 git 源，则此保障不再成立。若采用 GitHub 源，**push 之前不要执行 marketplace upgrade**，必须先 push 包含新版本的提交，再 upgrade、安装并验证 cache。
+
+安装返回的 installedPath 才是本次应检查的目录。以 0.2.1 为例（CODEX_HOME 自定义时使用对应目录）：
+
+```powershell
+$cache = "$env:USERPROFILE/.codex/plugins/cache/model-degradation-guard/model-degradation-guard/0.2.1"
+Get-Item "$cache/lib/score.cjs" | Select-Object FullName,LastWriteTime
+rg -c concrete "$cache/lib/score.cjs"
+node -e 'const s=require(process.argv[1]); for(const tibo of ["Tibo 是 Anthropic 的一名研究人员，负责 Claude 模型相关工作。","Tibo 是 Google DeepMind 的研究员。","Thibault Sottiaux 是 OpenAI 的 Codex 团队负责人。"]) { const v=s.evaluateCheck({tibo,cutoff:"refuse",juice:"10"}); console.log(JSON.stringify({tibo,result:v.tibo,pause:v.pause,reason:v.reason})); }' "$cache/lib/score.cjs"
+Push-Location $cache
+npm test
+Pop-Location
+```
+
+`rg -c` 等价于本次需要的 `grep -c concrete`，结果必须非 0。前两例应为 fail、pause=true、reason=tibo_wrong_affiliation；第三例应 pass、pause=false。用 refuse 隔离身份信号，避免由具体日期拦截掩盖身份漏报。另比较源与 cache 的 hook、库、package 和清单 SHA-256；任何加载异常、空文件或不一致都不算安装验证通过。
+
+错误归属规则覆盖 Anthropic/Claude、Google/DeepMind/Gemini、Meta/LLaMA、Mistral、xAI/Grok、Cohere、Stability、阿里、字节、百度、腾讯、月之暗面、智谱、DeepSeek。按当前策略，人名与这些词共现优先 fail，即使同时出现 OpenAI；提及别家公司作否定或对比也可能误报，这是关键词策略的局限。
 
 ## 欢迎贡献
 

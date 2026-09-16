@@ -109,6 +109,14 @@ test('具体截止日期单独暂停并记录 cutoffConcrete', () => {
   assert.equal(saved.checkHistory[0].cutoffConcrete, true);
 });
 
+test('错误归属经过真实 hook 后 deny 并持久化专用原因', () => {
+  denied(writeAttempt('wrong-affiliation', 't1', 'Tibo 是 Anthropic 的一名研究人员，负责 Claude 模型相关工作。'));
+  const saved = state.readState('wrong-affiliation');
+  assert.equal(saved.status, 'degraded');
+  assert.equal(saved.last.reason, 'tibo_wrong_affiliation');
+  assert.equal(saved.checkHistory[0].tiboKind, 'fail');
+});
+
 test('cutoff 模式环境变量：pause / flag / off；非法值退回 pause', () => {
   const key = 'MODEL_DEGRADATION_GUARD_CONCRETE_CUTOFF_MODE';
   const old = process.env[key];
