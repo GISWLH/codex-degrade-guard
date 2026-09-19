@@ -177,9 +177,13 @@ function handleUserPromptSubmit(input, now, ensureFreshImpl = update.ensureFresh
 
 // 本轮自检来源优先级：MCP 工具写入的状态 > transcript 里的工具调用 > 兼容旧格式的正文行。
 function resolveAnswers(input, current, snapshot) {
-  if (!input.turn_id) return null;
+  // 状态答案有 turn_id 时严格绑回合；缺 turn_id 时退回 token 口径，否则打卡成功也读不回来，
+  // 写/删会被永久拦住。
   const recorded = state.answersForCurrentCheck(current, input.turn_id);
   if (recorded) return { ...recorded, source: recorded.source || 'state' };
+
+  // transcript 兜底必须能确定回合归属，缺 turn_id 时不猜。
+  if (!input.turn_id) return null;
 
   const fromTools = transcript.extractSubmittedCheck(snapshot.records, input.turn_id);
   if (fromTools) return fromTools;

@@ -102,9 +102,9 @@ UserPromptSubmit 发新 token，MCP submit_check 记录答案；备用来源是�
 
 状态保存于 `$CODEX_HOME/model-degradation-guard/<session_id>.json`，默认 `~/.codex`。保留 state version 1 和原字段，新增字段兼容读入，不清除旧 degraded。
 
-答案必须同时满足 token、answers.turnId、check.turnId 与 PreToolUse turn_id 一致。MCP 按 token 找状态并复制其绑定 turnId；模型不能任意指定归属。子回合缺自己的答案时 deny(buildMissingCheckReason)，签发本回合 token。同一 session 的多个回合交错使 token 更新时，被替代回合需重新打卡，不能借用其他回合答案。
+Codex 提供 turn_id 时，答案必须同时满足 token、answers.turnId、check.turnId 与 PreToolUse turn_id 一致。MCP 按 token 找状态并复制其绑定 turnId；模型不能任意指定归属。子回合缺自己的答案时 deny(buildMissingCheckReason)，签发本回合 token。同一 session 的多个回合交错使 token 更新时，被替代回合需重新打卡，不能借用其他回合答案。
 
-transcript 只取明确匹配 turn_id 或位于该回合起始标记后的记录；遇到另一回合起始标记立即停止把无标记记录归于前一回合。支持 MCP item、直接 JSON 工具调用、代码包装调用和正文行。缺少 turn_id 不猜测归属，deny 未打卡；不可读 transcript 属环境故障，仍放行。
+transcript 只取明确匹配 turn_id 或位于该回合起始标记后的记录；遇到另一回合起始标记立即停止把无标记记录归于前一回合。支持 MCP item、直接 JSON 工具调用、代码包装调用和正文行。Codex 未提供 turn_id 时不猜归属，但状态里按本轮 token 打卡的答案仍然认，避免打卡成功也读不回来把写/删永久拦住；不可读 transcript 属环境故障，仍放行。
 
 | 状态 | 转移 |
 |---|---|

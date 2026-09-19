@@ -210,7 +210,7 @@ Juice 偏低但非 0 不单独暂停；上游 capacity 不当降智，也不能�
 
 批准只绑当前 `session_id`。回复「继续」沿用 `approveSession`，记录 `approval.basis` 与时间；每轮仍须自己的打卡。自动恢复要求连续 N 个不同回合均 `verdict.pause=false` 且 `tibo=pass`，默认 N=3，环境变量 `MODEL_DEGRADATION_GUARD_RECOVERY_PASSES` 可覆盖；含糊、失败或缺失打卡会中断累计。同轮重试不加次数。cutoff 任何档位都不充当恢复分数；Tibo pass 配合非暂停结果才计一轮。恢复写入 `recoveredAt`（原因、回合列表、阈值、时间），后续再次命中仍会暂停。
 
-状态答案必须同时匹配 token、答案 turnId、check.turnId 和工具调用 turn_id。子回合缺打卡时 deny 并签发该回合 token；父会话或上一回合答案不能复用。transcript 备用答案也按当前回合切片。降智后实际放行过写删才由 `Stop` 提醒，并附解封依据。
+状态答案在 Codex 提供 `turn_id` 时必须同时匹配 token、答案 turnId、check.turnId 和工具调用 turn_id；缺少 `turn_id` 时退回只比 token，避免打卡成功也读不回来。子回合缺打卡时 deny 并签发该回合 token；父会话或上一回合答案不能复用。transcript 备用答案只在有 `turn_id` 时按当前回合切片。降智后实际放行过写删才由 `Stop` 提醒，并附解封依据。
 
 ## 安装与生效校验
 

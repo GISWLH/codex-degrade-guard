@@ -154,7 +154,8 @@ test('answersForCurrentCheck 只认当前轮令牌的答案', () => {
   current.answers = { token: 'tok-1', turnId: 'turn-1', tibo: 'fresh' };
   assert.equal(state.answersForCurrentCheck(current, 'turn-1').tibo, 'fresh');
   assert.equal(state.answersForCurrentCheck(current, 'turn-child'), null);
-  assert.equal(state.answersForCurrentCheck(current), null);
+  // 缺 turn_id（Codex 未提供）时退回 token 口径，否则打卡写回的答案永远读不到。
+  assert.equal(state.answersForCurrentCheck(current).tibo, 'fresh');
   current.answers.turnId = 'turn-stale';
   assert.equal(state.answersForCurrentCheck(current, 'turn-1'), null);
 

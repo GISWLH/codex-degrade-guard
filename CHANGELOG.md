@@ -7,6 +7,7 @@
 ### Fixed
 
 - 修复 Codex Desktop 重启后 hook 不注册：将 `UserPromptSubmit`、`PreToolUse`、`Stop` 从外部路径字符串改为 `.codex-plugin/plugin.json` 内嵌清单对象。
+- 修复 Codex 未提供 `turn_id` 时状态答案读不回来、打卡成功也把写/删永久拦住：缺 `turn_id` 时状态答案退回只比 token，transcript 兜底仍要求回合归属，不重新引入父子回合串用。
 - 同步提升 `package.json` 与插件清单版本，避免同版本缓存覆盖。
 
 ## [0.2.1] - 2026-09-16

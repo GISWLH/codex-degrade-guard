@@ -102,6 +102,40 @@ test('父回合答案不能复用于子回合；子回合可获得并提交自�
   assert.equal(writeAttempt('binding', 'child'), null);
 });
 
+// 兜底：Codex 不传 turn_id 时不能死锁。状态答案退回 token 口径，transcript 仍不猜归属。
+test('缺少 turn_id 时退回 token 口径，打卡后可放行而不是永久拦截', () => {
+  const session = 'no-turn-id';
+  const file = path.join(dir, `${session}.jsonl`);
+  fs.writeFileSync(file, JSON.stringify({ type: 'turn_context', payload: { turn_id: 'inner' } }) + '\n');
+  const input = { session_id: session, transcript_path: file, tool_name: 'apply_patch', tool_input: {} };
+
+  const blocked = guard.handlePreToolUse(input, now);
+  denied(blocked);
+  assert.equal(state.readState(session).check.turnId, null);
+  const token = /token=([A-Za-z0-9_-]+)/.exec(blocked.hookSpecificOutput.permissionDecisionReason)[1];
+  assert.equal(state.recordAnswersByToken(token, { tibo: pass, cutoff: 'refuse', juice: '128' }, now).ok, true);
+  assert.equal(guard.handlePreToolUse(input, now), null);
+  assert.equal(state.readState(session).status, 'healthy');
+});
+
+test('缺少 turn_id 时不从 transcript 猜答案归属，没有 token 打卡仍拦下', () => {
+  const session = 'no-turn-id-transcript';
+  const file = path.join(dir, `${session}.jsonl`);
+  const call = {
+    type: 'response_item',
+    payload: {
+      type: 'function_call',
+      name: 'mcp__model_degradation_guard__submit_check',
+      arguments: JSON.stringify({ token: 'guessed', tibo: pass, cutoff: 'refuse', juice: '128' })
+    }
+  };
+  fs.writeFileSync(file, [{ type: 'turn_context', payload: { turn_id: 'inner' } }, call].map(JSON.stringify).join('\n'));
+  const output = guard.handlePreToolUse({ session_id: session, transcript_path: file, tool_name: 'apply_patch', tool_input: {} }, now);
+  denied(output);
+  assert.match(output.hookSpecificOutput.permissionDecisionReason, /本轮还没有提交自检/);
+  assert.equal(state.readState(session).status, 'unknown');
+});
+
 test('具体截止日期单独暂停并记录 cutoffConcrete', () => {
   denied(writeAttempt('cutoff', 't1', pass, '2024-12'));
   const saved = state.readState('cutoff');
