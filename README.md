@@ -1,3 +1,7 @@
+<!-- readme-visual-refresh:banner -->
+![codex-degrade-guard — hand-drawn project banner](assets/readme/banner.svg)
+<!-- /readme-visual-refresh:banner -->
+
 <div align="center">
 
 <img src="assets/logo.svg" width="96" height="96" alt="Model Degradation Guard">
@@ -281,3 +285,7 @@ MIT © [HUTAO667](https://x.com/HUTAO667)
 如果这个插件帮你拦住过一次偷偷换模，欢迎点 Star，也欢迎把新的检测规则开过来。
 
 </div>
+
+<!-- readme-visual-refresh:artwork-source -->
+[Editable banner artwork · Excalidraw](assets/readme/banner.excalidraw)
+<!-- /readme-visual-refresh:artwork-source -->
